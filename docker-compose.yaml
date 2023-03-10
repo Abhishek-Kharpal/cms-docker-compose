@@ -1,0 +1,103 @@
+version: "3"    
+services:
+  db-auth:
+    image: postgres
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./cms-auth/db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  db-cms:
+    image: postgres
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./cms-be/db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis
+    restart: always
+  cmsfrontend:
+    build:
+      context: ./cms-fe
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - cmsbackend
+      - authbackend
+  cmsbackend:
+    build:
+      context: ./cms-be
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      db-cms:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-cms
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_PORT: 5432
+  migrate-cms:
+    build:
+      context: ./cms-be
+      dockerfile: Dockerfile.migrate
+    depends_on:
+      db-cms:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-cms
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_PORT: 5432
+  authbackend:
+    build:
+      context: ./cms-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      db-auth:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-auth
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_PORT: 5432
+  migrate-auth:
+    build:
+      context: ./cms-auth
+      dockerfile: Dockerfile.migrate
+    depends_on:
+      db-auth:
+        condition: service_healthy
+    environment:
+      DB_HOST: db-auth
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+      DB_PORT: 5432
+  
